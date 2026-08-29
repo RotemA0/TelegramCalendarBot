@@ -2,7 +2,7 @@
 
 A personal Telegram bot that:
 1. **Daily briefing** — once a day, sends today's Google Calendar events to your Telegram chat.
-2. **Natural-language event creator** — message the bot something like `Math test on Thursday at 10 AM` and it parses out a title + date/time and creates a calendar event.
+2. **Natural-language event creator** — message the bot something like `Math test on Thursday at 10 AM` and it parses out a title + date/time and creates a calendar event. If you don't give a time (`Chemistry test Friday`), it creates an all-day event instead of defaulting to midnight. The confirmation reply shows the full start–end time. Events are also color-coded in Google Calendar by keyword — see `categories.json`.
 
 Runs entirely on **GitHub Actions** — no server, no cloud hosting bill, no credit card required anywhere.
 
@@ -27,6 +27,17 @@ This repo is **public** specifically so GitHub's Actions minutes are uncondition
 private repos only get 2,000 free minutes/month, which 5-minute polling would exceed. No
 secrets live in the code; everything sensitive is a GitHub encrypted secret, injected as an
 env var only for the duration of a run.
+
+## Color-coding events
+
+`categories.json` maps keywords to a Google Calendar `colorId` — the bot checks the message
+text against it and applies the first match. Add or change a category by editing the file, no
+code changes needed (see [Calendar API color reference](https://developers.google.com/calendar/api/v3/reference/colors/get)
+for the full colorId list):
+
+```json
+{ "label": "Something", "colorId": "7", "keywords": ["keyword1", "keyword2"] }
+```
 
 ## Required GitHub secrets
 
