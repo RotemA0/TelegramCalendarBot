@@ -1,0 +1,14 @@
+[
+  {
+    "label": "Test",
+    "colorId": "11",
+    "colorName": "Tomato (red)",
+    "keywords": ["test", "exam", "quiz", "midterm", "final"]
+  },
+  {
+    "label": "Doctor",
+    "colorId": "2",
+    "colorName": "Sage (green)",
+    "keywords": ["doctor", "dentist", "appointment", "clinic", "checkup", "physician"]
+  }
+]

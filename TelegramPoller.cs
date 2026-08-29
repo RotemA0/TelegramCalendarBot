@@ -50,12 +50,16 @@ public static class TelegramPoller
                 continue;
             }
 
-            await calendar.CreateEventAsync(parsed.Title, parsed.Start, parsed.End);
-            var formattedDate = parsed.Start.ToString("dddd, MMM d 'at' HH:mm", CultureInfo.InvariantCulture);
+            var colorId = EventCategorizer.DetectColorId(text);
+            await calendar.CreateEventAsync(parsed.Title, parsed.Start, parsed.End, colorId);
+
+            var formattedRange = parsed.End.Date == parsed.Start.Date
+                ? $"{parsed.Start.ToString("dddd, MMM d", CultureInfo.InvariantCulture)} at {parsed.Start.ToString("HH:mm", CultureInfo.InvariantCulture)}–{parsed.End.ToString("HH:mm", CultureInfo.InvariantCulture)}"
+                : $"{parsed.Start.ToString("dddd, MMM d 'at' HH:mm", CultureInfo.InvariantCulture)} – {parsed.End.ToString("dddd, MMM d 'at' HH:mm", CultureInfo.InvariantCulture)}";
             // parsed.Title comes from the user's own free-text message — HTML-encode before
             // it goes into a parse_mode=HTML reply, or a stray '<' breaks the send.
             var safeTitle = System.Net.WebUtility.HtmlEncode(parsed.Title);
-            await telegram.SendMessageAsync($"✅ Created: <b>{safeTitle}</b>\n{formattedDate}");
+            await telegram.SendMessageAsync($"✅ Created: <b>{safeTitle}</b>\n{formattedRange}");
         }
 
         await File.WriteAllTextAsync(OffsetFile, (maxUpdateId + 1).ToString(CultureInfo.InvariantCulture));

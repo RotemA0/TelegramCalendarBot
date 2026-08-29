@@ -31,13 +31,14 @@ public class CalendarService
         _calendarId = config["Google:CalendarId"]!;
     }
 
-    public async Task<Event> CreateEventAsync(string title, DateTime start, DateTime end)
+    public async Task<Event> CreateEventAsync(string title, DateTime start, DateTime end, string? colorId = null)
     {
         var newEvent = new Event
         {
             Summary = title,
             Start = new EventDateTime { DateTimeDateTimeOffset = new DateTimeOffset(start, _tz.GetUtcOffset(start)) },
-            End = new EventDateTime { DateTimeDateTimeOffset = new DateTimeOffset(end, _tz.GetUtcOffset(end)) }
+            End = new EventDateTime { DateTimeDateTimeOffset = new DateTimeOffset(end, _tz.GetUtcOffset(end)) },
+            ColorId = colorId
         };
 
         var request = _service.Events.Insert(newEvent, _calendarId);
