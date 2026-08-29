@@ -1,3 +1,4 @@
+using System.Globalization;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Calendar.v3;
 using Google.Apis.Calendar.v3.Data;
@@ -31,15 +32,23 @@ public class CalendarService
         _calendarId = config["Google:CalendarId"]!;
     }
 
-    public async Task<Event> CreateEventAsync(string title, DateTime start, DateTime end, string? colorId = null)
+    public async Task<Event> CreateEventAsync(string title, DateTime start, DateTime end, string? colorId = null, bool isAllDay = false)
     {
-        var newEvent = new Event
+        var newEvent = new Event { Summary = title, ColorId = colorId };
+
+        if (isAllDay)
         {
-            Summary = title,
-            Start = new EventDateTime { DateTimeDateTimeOffset = new DateTimeOffset(start, _tz.GetUtcOffset(start)) },
-            End = new EventDateTime { DateTimeDateTimeOffset = new DateTimeOffset(end, _tz.GetUtcOffset(end)) },
-            ColorId = colorId
-        };
+            // Google's all-day convention: Date-only start/end, with end being the day
+            // *after* the last included day (exclusive), which is what EventParser already
+            // produces for an all-day match.
+            newEvent.Start = new EventDateTime { Date = start.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) };
+            newEvent.End = new EventDateTime { Date = end.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) };
+        }
+        else
+        {
+            newEvent.Start = new EventDateTime { DateTimeDateTimeOffset = new DateTimeOffset(start, _tz.GetUtcOffset(start)) };
+            newEvent.End = new EventDateTime { DateTimeDateTimeOffset = new DateTimeOffset(end, _tz.GetUtcOffset(end)) };
+        }
 
         var request = _service.Events.Insert(newEvent, _calendarId);
         return await request.ExecuteAsync();

@@ -5,7 +5,7 @@ using Microsoft.Recognizers.Text.DateTime;
 
 public static class EventParser
 {
-    public record ParsedEvent(string Title, DateTime Start, DateTime End);
+    public record ParsedEvent(string Title, DateTime Start, DateTime End, bool IsAllDay);
 
     // Connector words/punctuation that dangle at either end of the message once the
     // matched date/time phrase is removed (e.g. "Math test [on Thursday at 10 AM]" -> "Math test on").
@@ -21,18 +21,26 @@ public static class EventParser
         var match = results[0];
         var values = (List<Dictionary<string, string>>)match.Resolution["values"];
 
-        var candidate = values
-            .Select(v => DateTime.Parse(v.GetValueOrDefault("value") ?? v["start"], CultureInfo.InvariantCulture))
-            .Where(dt => dt >= DateTime.Now)
-            .DefaultIfEmpty(DateTime.Parse(values[0].GetValueOrDefault("value") ?? values[0]["start"], CultureInfo.InvariantCulture))
+        // The recognizer tags each candidate's "type": "date" means just a day was
+        // mentioned (no time), vs "datetime" when a specific time was given too.
+        // That tells us whether this should become an all-day event.
+        var candidates = values
+            .Select(v => (
+                DateTime: DateTime.Parse(v.GetValueOrDefault("value") ?? v["start"], CultureInfo.InvariantCulture),
+                IsAllDay: v.GetValueOrDefault("type") == "date"))
+            .ToList();
+
+        var candidate = candidates
+            .Where(c => c.DateTime >= DateTime.Now)
+            .DefaultIfEmpty(candidates[0])
             .First();
 
-        var start = candidate;
-        var end = start.AddHours(1);
+        var start = candidate.DateTime;
+        var end = candidate.IsAllDay ? start.Date.AddDays(1) : start.AddHours(1);
 
         var title = ExtractTitle(message, match);
 
-        return new ParsedEvent(title, start, end);
+        return new ParsedEvent(title, start, end, candidate.IsAllDay);
     }
 
     private static string ExtractTitle(string message, ModelResult match)
