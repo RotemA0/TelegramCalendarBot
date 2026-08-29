@@ -52,7 +52,10 @@ public static class TelegramPoller
 
             await calendar.CreateEventAsync(parsed.Title, parsed.Start, parsed.End);
             var formattedDate = parsed.Start.ToString("dddd, MMM d 'at' HH:mm", CultureInfo.InvariantCulture);
-            await telegram.SendMessageAsync($"✅ Created: <b>{parsed.Title}</b>\n{formattedDate}");
+            // parsed.Title comes from the user's own free-text message — HTML-encode before
+            // it goes into a parse_mode=HTML reply, or a stray '<' breaks the send.
+            var safeTitle = System.Net.WebUtility.HtmlEncode(parsed.Title);
+            await telegram.SendMessageAsync($"✅ Created: <b>{safeTitle}</b>\n{formattedDate}");
         }
 
         await File.WriteAllTextAsync(OffsetFile, (maxUpdateId + 1).ToString(CultureInfo.InvariantCulture));

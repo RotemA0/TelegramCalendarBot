@@ -41,7 +41,9 @@ public static class DailyBriefing
             var lines = events.Select(e =>
             {
                 var time = e.Start.DateTimeDateTimeOffset?.ToString("HH:mm", CultureInfo.InvariantCulture) ?? "All day";
-                return $"{time} — {e.Summary}";
+                // Event summaries are arbitrary user-entered text — HTML-encode before it goes
+                // into a parse_mode=HTML Telegram message, or a stray '<' breaks the send.
+                return $"{time} — {System.Net.WebUtility.HtmlEncode(e.Summary)}";
             });
             message = "<b>Today's schedule</b>\n\n" + string.Join("\n", lines);
         }
