@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: telegram-poll
@@ -47,3 +48,17 @@ jobs:
           git add state/
           git diff --cached --quiet || git commit -m "chore: update telegram poll offset [skip ci]"
           git push
+
+      # GitHub's native `schedule:` trigger above is kept as a free extra layer, but it has
+      # been observed to simply never fire for a brand-new repo (a known, documented platform
+      # quirk — see community discussions on "scheduled workflow never triggers on a brand-new
+      # repo"). This makes the 5-minute cadence self-sufficient regardless: every run
+      # re-triggers the next one itself, so once started, it keeps going even if the native
+      # schedule never activates. if: always() so a failure above still keeps the chain alive.
+      - name: Schedule next poll
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sleep 300
+          gh workflow run telegram-poll.yml --ref ${{ github.ref_name }}

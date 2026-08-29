@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: daily-briefing
@@ -53,3 +54,13 @@ jobs:
           git add state/
           git diff --cached --quiet || git commit -m "chore: record daily briefing sent [skip ci]"
           git push
+
+      # See telegram-poll.yml for why: GitHub's native schedule trigger has been observed to
+      # simply never fire for this repo, so the hourly cadence keeps itself alive regardless.
+      - name: Schedule next check
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sleep 3600
+          gh workflow run daily-briefing.yml --ref ${{ github.ref_name }}
