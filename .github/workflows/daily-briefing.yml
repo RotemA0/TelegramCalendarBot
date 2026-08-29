@@ -5,6 +5,7 @@ name: Daily Briefing
 # checks the real Israel local time and only actually sends once, at the configured hour.
 on:
   schedule:
+    # re-touched to force GitHub to re-register the schedule after it failed to fire
     - cron: '0 * * * *'
   workflow_dispatch:
     inputs:

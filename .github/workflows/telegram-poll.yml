@@ -4,6 +4,7 @@ name: Telegram Poll
 # every 5 minutes for new messages and creates calendar events from them.
 on:
   schedule:
+    # re-touched to force GitHub to re-register the schedule after it failed to fire
     - cron: '*/5 * * * *'
   workflow_dispatch: {}
 
