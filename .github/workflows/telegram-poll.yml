@@ -1,0 +1,48 @@
+name: Telegram Poll
+
+# Stands in for the old webhook: since there's no always-on server, this checks Telegram
+# every 5 minutes for new messages and creates calendar events from them.
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: telegram-poll
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Decode service account key
+        run: echo "${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON_B64 }}" | base64 -d > service-account.json
+
+      - name: Poll Telegram for new messages
+        env:
+          Telegram__BotToken: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          Telegram__ChatId: ${{ secrets.TELEGRAM_CHAT_ID }}
+          Google__CalendarId: ${{ secrets.GOOGLE_CALENDAR_ID }}
+          Google__ServiceAccountKeyPath: service-account.json
+        run: dotnet run --configuration Release -- poll
+
+      - name: Clean up key file
+        if: always()
+        run: rm -f service-account.json
+
+      - name: Persist offset state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add state/
+          git diff --cached --quiet || git commit -m "chore: update telegram poll offset [skip ci]"
+          git push

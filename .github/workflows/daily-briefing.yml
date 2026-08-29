@@ -1,0 +1,54 @@
+name: Daily Briefing
+
+# Stands in for the old Cloud Scheduler job. Runs every hour (GitHub Actions cron is UTC
+# and can't express a fixed Asia/Jerusalem clock time across DST changes) — the app itself
+# checks the real Israel local time and only actually sends once, at the configured hour.
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Send now regardless of the hour / whether today already sent (for manual testing)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-briefing
+  cancel-in-progress: false
+
+jobs:
+  briefing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Decode service account key
+        run: echo "${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON_B64 }}" | base64 -d > service-account.json
+
+      - name: Send daily briefing (if it's time)
+        env:
+          Telegram__BotToken: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          Telegram__ChatId: ${{ secrets.TELEGRAM_CHAT_ID }}
+          Google__CalendarId: ${{ secrets.GOOGLE_CALENDAR_ID }}
+          Google__ServiceAccountKeyPath: service-account.json
+        run: dotnet run --configuration Release -- daily-briefing ${{ inputs.force && '--force' || '' }}
+
+      - name: Clean up key file
+        if: always()
+        run: rm -f service-account.json
+
+      - name: Persist briefing state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add state/
+          git diff --cached --quiet || git commit -m "chore: record daily briefing sent [skip ci]"
+          git push

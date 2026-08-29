@@ -1,0 +1,18 @@
+# Build output
+bin/
+obj/
+
+# User-specific files
+*.user
+*.suo
+
+# Secrets — never commit these
+service-account.json
+*.pfx
+
+# Local test/scratch payloads
+test.json
+
+# IDE
+.vs/
+.idea/
