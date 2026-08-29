@@ -13,25 +13,41 @@ public static class EventParser
         @"^(?:\s*[,\-:]\s*|\s+(?:on|at|in|for|by|this|that|next|coming)\b)+|(?:\s*[,\-:]\s*|\s+(?:on|at|in|for|by|this|that|next|coming)\b)+$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    private static readonly TimeZoneInfo IsraelTz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Jerusalem");
+
     public static ParsedEvent? Parse(string message)
     {
-        var results = DateTimeRecognizer.RecognizeDateTime(message, Culture.English);
+        // The recognizer resolves relative phrases ("today", "tomorrow", "Thursday") against
+        // a reference "now" — if left to its default, that's the machine's local clock, which
+        // on GitHub Actions runners is UTC, not Israel time. Between Israel midnight and UTC
+        // midnight every night, that silently resolved "today" to the wrong calendar day.
+        // Passing an explicit Israel-local reference time fixes it regardless of what timezone
+        // the process actually runs in.
+        var nowIsrael = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, IsraelTz);
+
+        var results = DateTimeRecognizer.RecognizeDateTime(message, Culture.English, DateTimeOptions.None, nowIsrael);
         if (results.Count == 0) return null;
 
         var match = results[0];
         var values = (List<Dictionary<string, string>>)match.Resolution["values"];
 
-        // The recognizer tags each candidate's "type": "date" means just a day was
-        // mentioned (no time), vs "datetime" when a specific time was given too.
-        // That tells us whether this should become an all-day event.
+        // Not every match resolves to an actual point in time: "for 2 hours" comes back as a
+        // "duration" (value is a number of seconds), "every Monday" as a "set" (value is the
+        // literal string "not resolved") — neither is a parseable date, and DateTime.Parse
+        // would throw. Skip anything that doesn't actually parse rather than crash on it.
         var candidates = values
             .Select(v => (
-                DateTime: DateTime.Parse(v.GetValueOrDefault("value") ?? v["start"], CultureInfo.InvariantCulture),
+                Text: v.GetValueOrDefault("value") is { Length: > 0 } val ? val : v.GetValueOrDefault("start"),
                 IsAllDay: v.GetValueOrDefault("type") == "date"))
+            .Where(v => v.Text is not null
+                        && DateTime.TryParse(v.Text, CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
+            .Select(v => (DateTime: DateTime.Parse(v.Text!, CultureInfo.InvariantCulture), v.IsAllDay))
             .ToList();
 
+        if (candidates.Count == 0) return null;
+
         var candidate = candidates
-            .Where(c => c.DateTime >= DateTime.Now)
+            .Where(c => c.DateTime >= nowIsrael)
             .DefaultIfEmpty(candidates[0])
             .First();
 
