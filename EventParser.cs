@@ -33,31 +33,62 @@ public static class EventParser
 
         // Not every match resolves to an actual point in time: "for 2 hours" comes back as a
         // "duration" (value is a number of seconds), "every Monday" as a "set" (value is the
-        // literal string "not resolved") — neither is a parseable date, and DateTime.Parse
-        // would throw. Skip anything that doesn't actually parse rather than crash on it.
+        // literal string "not resolved") — neither is a parseable date. And an explicit range
+        // ("3pm to 5pm", "Monday through Wednesday") comes back as a "datetimerange"/"timerange"/
+        // "daterange" with separate "start"/"end" fields instead of a single "value" — that real
+        // end has to be used rather than defaulting to start+1h/next-day. Skip anything that
+        // doesn't resolve to a usable candidate rather than crash or silently drop the range.
         var candidates = values
-            .Select(v => (
-                Text: v.GetValueOrDefault("value") is { Length: > 0 } val ? val : v.GetValueOrDefault("start"),
-                IsAllDay: v.GetValueOrDefault("type") == "date"))
-            .Where(v => v.Text is not null
-                        && DateTime.TryParse(v.Text, CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
-            .Select(v => (DateTime: DateTime.Parse(v.Text!, CultureInfo.InvariantCulture), v.IsAllDay))
+            .Select(ResolveCandidate)
+            .Where(c => c is not null)
+            .Select(c => c!.Value)
             .ToList();
 
         if (candidates.Count == 0) return null;
 
         var candidate = candidates
-            .Where(c => c.DateTime >= nowIsrael)
+            .Where(c => c.Start >= nowIsrael)
             .DefaultIfEmpty(candidates[0])
             .First();
 
-        var start = candidate.DateTime;
-        var end = candidate.IsAllDay ? start.Date.AddDays(1) : start.AddHours(1);
-
         var title = ExtractTitle(message, match);
 
-        return new ParsedEvent(title, start, end, candidate.IsAllDay);
+        return new ParsedEvent(title, candidate.Start, candidate.End, candidate.IsAllDay);
     }
+
+    private static (DateTime Start, DateTime End, bool IsAllDay)? ResolveCandidate(Dictionary<string, string> v)
+    {
+        switch (v.GetValueOrDefault("type"))
+        {
+            case "date":
+                if (!TryParse(v.GetValueOrDefault("value"), out var d)) return null;
+                return (d.Date, d.Date.AddDays(1), IsAllDay: true);
+
+            case "datetime":
+            case "time":
+                if (!TryParse(v.GetValueOrDefault("value"), out var dt)) return null;
+                return (dt, dt.AddHours(1), IsAllDay: false);
+
+            case "daterange":
+                if (!TryParse(v.GetValueOrDefault("start"), out var ds) || !TryParse(v.GetValueOrDefault("end"), out var de))
+                    return null;
+                // The recognizer's range end is inclusive of the last day; Google Calendar's
+                // all-day end is exclusive, so push it one day past the last included day.
+                return (ds.Date, de.Date.AddDays(1), IsAllDay: true);
+
+            case "datetimerange":
+            case "timerange":
+                if (!TryParse(v.GetValueOrDefault("start"), out var ts) || !TryParse(v.GetValueOrDefault("end"), out var te))
+                    return null;
+                return (ts, te, IsAllDay: false);
+
+            default:
+                return null;
+        }
+    }
+
+    private static bool TryParse(string? text, out DateTime value) =>
+        DateTime.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out value);
 
     private static string ExtractTitle(string message, ModelResult match)
     {
