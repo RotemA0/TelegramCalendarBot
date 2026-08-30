@@ -1,5 +1,11 @@
 [
   {
+    "label": "Driving",
+    "colorId": "5",
+    "colorName": "Banana (yellow)",
+    "keywords": ["driving lesson", "driving lessons", "driving test", "driving instructor", "driving theory", "driving school"]
+  },
+  {
     "label": "Test",
     "colorId": "11",
     "colorName": "Tomato (red)",
